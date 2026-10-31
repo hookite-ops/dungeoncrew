@@ -91,6 +91,19 @@ input { font-family: inherit; font-size: 16px; user-select: text; -webkit-user-s
 #bar-hp i { background: linear-gradient(#ff7a8a, #d9304a); } #bar-ar i { background: linear-gradient(#e0e6f0, #8a94a8); } #bar-en i { background: linear-gradient(#7ac0ff, #2a6ad9); }
 #coins-row { display: flex; justify-content: space-between; font-size: 12px; margin-top: 3px; color: var(--hi); }
 #team { margin-top: 4px; }
+#buffs { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; font-size: 12px; color: var(--hi); }
+#buffs span { min-width: 18px; height: 18px; padding: 0 2px; display: inline-flex; align-items: center; justify-content: center; background: #120e1c; border: 2px solid var(--edge); }
+#buffs sub { font-size: 8px; color: #fff; }
+#buffpick { background: rgba(8,6,14,.55); }
+.bp { text-align: center; padding: 0 12px; }
+.bp h3 { color: var(--hi); margin: 0 0 12px; font-size: 18px; text-shadow: 0 2px 0 #000; }
+#buff-cards { display: flex; gap: 10px; justify-content: center; }
+.bcard { width: min(170px, 28vw); padding: 12px 8px 14px; background: var(--panel); border: 3px solid var(--edge); box-shadow: inset 0 3px 0 rgba(255,255,255,.1), 0 4px 0 rgba(0,0,0,.4), 0 0 0 2px #a0582a; display: flex; flex-direction: column; align-items: center; gap: 6px; transition: transform 120ms var(--ease-out); }
+.bcard:active { transform: scale(0.96); }
+#buffpick.on .bcard { transition: opacity 240ms var(--ease-out), transform 240ms var(--ease-out); transition-delay: calc(var(--i) * 50ms); }
+@starting-style { #buffpick.on .bcard { opacity: 0; transform: translateY(10px); } }
+.bcard i { font-style: normal; font-size: 26px; color: var(--hi); width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; background: #120e1c; border: 2px solid var(--edge); }
+.bcard b { font-size: 14px; color: var(--hi); } .bcard small { font-size: 11px; color: #d8d0f0; line-height: 1.4; } .bcard em { font-style: normal; font-size: 10px; color: var(--ok); }
 .mate { font-size: 10px; display: flex; align-items: center; gap: 4px; margin-top: 2px; } .mate span { width: 70px; overflow: hidden; white-space: nowrap; }
 .mate i { height: 4px; width: 80px; background: #ff5a6a; display: block; transform-origin: left center; } .mate.down span::after { content: ' ✖'; color: #ff5a6a; }
 #topc { position: absolute; left: 50%; top: max(8px, env(safe-area-inset-top)); transform: translateX(-50%); text-align: center; }
@@ -169,6 +182,7 @@ input { font-family: inherit; font-size: 16px; user-select: text; -webkit-user-s
     <div class="bar" id="bar-ar"><em>🛡</em><i></i><b></b></div>
     <div class="bar" id="bar-en"><em>⚡</em><i></i><b></b></div>
     <div id="coins-row"><span>🪙 <span id="coins">0</span></span></div>
+    <div id="buffs"></div>
     <div id="team"></div>
   </div>
   <div id="topc"><div id="lvl" class="px">1-1</div><div id="boss"><b></b><div><i></i></div></div></div>
@@ -238,10 +252,15 @@ input { font-family: inherit; font-size: 16px; user-select: text; -webkit-user-s
   <button class="btn" id="b-over-menu">메뉴로</button>
 </div></div>
 
+<div class="ov" id="buffpick"><div class="bp">
+  <h3>버프를 하나 고르세요</h3>
+  <div id="buff-cards"></div>
+</div></div>
 <div id="toast"></div>
 <div id="rotate"><div>📱</div>화면을 가로로 돌려 주세요</div>
 
 <script src="data.js"></script>
+<script src="content.js"></script>
 <script src="core.js"></script>
 <script src="game.js"></script>
 <script src="ui.js"></script>

@@ -285,7 +285,7 @@ const UI = {
     ME.lastHpAr = -1;
     this._c = null;
   },
-  leaveGame() { Input.reset(); G.paused = false; clearTimeout(this._overT); $('#hud').classList.remove('on'); $('#touch').classList.remove('on'); $('#pause').classList.remove('on'); $('#over').classList.remove('on'); },
+  leaveGame() { $('#buffpick').classList.remove('on'); this._buffQ = 0; clearTimeout(G._buffT); Input.reset(); G.paused = false; clearTimeout(this._overT); $('#hud').classList.remove('on'); $('#touch').classList.remove('on'); $('#pause').classList.remove('on'); $('#over').classList.remove('on'); },
   pause(on) {
     $('#pause').classList.toggle('on', on);
     $('#t-autofire2').checked = this.settings.autofire;
@@ -297,6 +297,20 @@ const UI = {
     $('#b-again').style.display = (!G.online || G.host) ? '' : 'none';
     $('#over-wait').style.display = (G.online && !G.host) ? '' : 'none';
     clearTimeout(this._overT); this._overT = setTimeout(() => { if (G.mode === 'play') $('#over').classList.add('on'); }, 900);
+  },
+  showBuffPick() {
+    const ov = $('#buffpick');
+    if (ov.classList.contains('on')) { this._buffQ = (this._buffQ || 0) + 1; return; }
+    const pool = BUFFS.slice(), pickd = [];
+    while (pickd.length < 3) pickd.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    const box = $('#buff-cards'); box.innerHTML = '';
+    pickd.forEach((b, i) => {
+      const c = document.createElement('button'); c.className = 'bcard'; c.style.setProperty('--i', i);
+      c.innerHTML = `<i>${b.icon}</i><b>${b.name}</b><small>${b.desc}</small>${ME.buffs[b.id] ? `<em>보유 ${ME.buffs[b.id]}</em>` : ''}`;
+      c.addEventListener('click', () => { SFX.init(); ov.classList.remove('on'); applyBuff(b.id); if (this._buffQ > 0) { this._buffQ--; setTimeout(() => this.showBuffPick(), 250); } });
+      box.appendChild(c);
+    });
+    ov.classList.add('on'); SFX.chest();
   },
   toast(t) {
     const el = $('#toast'); el.textContent = t; el.classList.add('on');
@@ -328,7 +342,7 @@ const UI = {
     put('sec', E.skillSec, 'text', ME.skillCd > 0 ? String(Math.ceil(ME.skillCd)) : '');
     // 상호작용
     const it = nearInteract();
-    if (it) put('use', E.use, 'text', { wpn: '줍기', chest: '상자 열기', rchest: '상자 열기', bchest: '보물 열기', vend: `뽑기 🪙${VEND_COST}`, portal: '다음 층' }[it.k]);
+    if (it) put('use', E.use, 'text', useLabel(it));
     flag('useOn', E.use, 'on', !!it);
     // 동료
     let html = '';
@@ -342,6 +356,10 @@ const UI = {
     if (G.banner) { put('bt', E.bt, 'text', G.banner.t); put('bs', E.bs, 'text', G.banner.sub); }
     flag('ban', E.banner, 'on', !!G.banner);
     flag('down', E.down, 'on', p.down && !G.over);
+    // 버프 아이콘
+    let bh = '';
+    for (const b of BUFFS) if (ME.buffs[b.id]) bh += `<span title="${b.name}">${b.icon}${ME.buffs[b.id] > 1 ? '<sub>' + ME.buffs[b.id] + '</sub>' : ''}</span>`;
+    if (C.buffs !== bh) { C.buffs = bh; $('#buffs').innerHTML = bh; }
     // 미니맵은 1초에 12번이면 충분
     this._mm = (this._mm || 0) + 1;
     if (this._mm % 5 === 0) this.minimap();
@@ -364,6 +382,22 @@ const UI = {
     for (const q of G.players.values()) { g.fillStyle = q.id === G.me ? '#ffe08a' : HEROES[q.hero].color; g.fillRect(ox + q.x / TILE * s - 1.5, oy + q.y / TILE * s - 1.5, 3, 3); }
   },
 };
+function useLabel(it) {
+  switch (it.k) {
+    case 'wpn': return '줍기';
+    case 'chest': case 'rchest': return '상자 열기';
+    case 'schest': return '은상자 열기';
+    case 'gchest': return '금상자 열기';
+    case 'bchest': return '보물 열기';
+    case 'vend': return `뽑기 🪙${VEND_COST}`;
+    case 'portal': return '다음 층';
+    case 'ware': return `구매 🪙${it.c}`;
+    case 'forge': return it.busy > 0 ? '녹이는 중' : `넣기 ${(it.stored || []).length}/2`;
+    case 'statue': return `기도 🪙${it.c}`;
+    case 'npc': return '말 걸기';
+  }
+  return '사용';
+}
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 function drawIcon(cv, wid) {
   const g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height);
@@ -390,7 +424,7 @@ function resize() {
 function frame(t) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (t - lastT) / 1000 || 0.016); lastT = t;
-  if (G.mode === 'play' && !G.paused) { update(dt); }
+  if (G.mode === 'play' && !G.paused) { if (G.hitStop > 0 && !G.online) G.hitStop -= dt; else { G.hitStop = 0; update(dt); } }
   if (G.mode === 'play') { render(ctx, lc, lctx, UI.scale); UI.hud(); }
   else menuBg(dt);
 }

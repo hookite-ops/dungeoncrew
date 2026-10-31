@@ -96,19 +96,27 @@ function genLevel(seed, L) {
       x = nx; y = ny; path.push([x, y]);
     }
     if (!ok) continue;
-    // 보물방 곁가지
-    const cands = [];
-    for (let i = 1; i < path.length - 1; i++) {
-      const [px, py] = path[i];
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const nx = px + dx, ny = py + dy;
-        if (nx >= 0 && ny >= 0 && nx < GRID && ny < GRID && !cells.has(key(nx, ny))) cands.push([px, py, nx, ny]);
+    // 곁가지 방: 보물방은 꼭, 상점·용광로·석상 중 1~2개
+    const specials = ['shop', 'forge', 'statue'];
+    for (let i = specials.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [specials[i], specials[j]] = [specials[j], specials[i]]; }
+    const want = ['chest', ...specials.slice(0, rng() < 0.55 ? 2 : 1)];
+    let placed = 0;
+    for (const type of want) {
+      const cands = [];
+      for (let i = 1; i < path.length - 1; i++) {
+        const [px, py] = path[i];
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = px + dx, ny = py + dy;
+          if (nx >= 0 && ny >= 0 && nx < GRID && ny < GRID && !cells.has(key(nx, ny))) cands.push([px, py, nx, ny]);
+        }
       }
+      if (!cands.length) break;
+      const [px, py, nx, ny] = cands[Math.floor(rng() * cands.length)];
+      cells.set(key(nx, ny), { cx: nx, cy: ny, type });
+      links.push([key(px, py), key(nx, ny)]);
+      placed++;
     }
-    if (!cands.length) continue;
-    const [px, py, nx, ny] = cands[Math.floor(rng() * cands.length)];
-    cells.set(key(nx, ny), { cx: nx, cy: ny, type: 'chest' });
-    links.push([key(px, py), key(nx, ny)]);
+    if (placed < 2) continue;
     break;
   }
 
@@ -120,6 +128,7 @@ function genLevel(seed, L) {
     let w, h;
     if (c.type === 'battle') { w = 15 + 2 * ri(0, 3); h = 13 + 2 * ri(0, 3); }
     else if (c.type === 'boss') { w = 25; h = 21; }
+    else if (c.type === 'shop') { w = 13; h = 11; }
     else { w = 11; h = 11; }
     const cx = c.cx * CELL + 15, cy = c.cy * CELL + 15;
     const r = { i: rooms.length, type: c.type, gx: c.cx, gy: c.cy, cx, cy, x0: cx - (w - 1) / 2, y0: cy - (h - 1) / 2, x1: cx + (w - 1) / 2, y1: cy + (h - 1) / 2,
@@ -164,18 +173,50 @@ function genLevel(seed, L) {
         const x = bx + ri(-1, 1), y = by + ri(-1, 1);
         if (tiles[y * W + x] !== 1 || crates.some(c => c.x === x && c.y === y)) continue;
         if (Math.abs(x - r.cx) <= 1 && Math.abs(y - r.cy) <= 1) continue;
-        crates.push({ i: crates.length, x, y, hp: 3, alive: true, kind: rng() < 0.25 ? 1 : 0 });
+        const kr = rng(); crates.push({ i: crates.length, x, y, hp: 3, alive: true, kind: kr < 0.22 ? 1 : kr < 0.5 ? 2 : 0 });
       }
     }
   }
   const crateAt = new Map();
   crates.forEach(c => crateAt.set(c.y * W + c.x, c));
 
+  // 3) 함정·지형: 가시(전투 중에만), 지역별 웅덩이(독/얼음/용암)
+  const hazAt = new Map(), hazards = [];
+  const poolType = ['poison', 'ice', 'lava'][biomeIdx];
+  const free = (x, y, r) => tiles[y * W + x] === 1 && !crateAt.has(y * W + x) && !hazAt.has(y * W + x) && (Math.abs(x - r.cx) > 1 || Math.abs(y - r.cy) > 1);
+  const addHaz = (x, y, t, room) => { const h = { x, y, t, room }; hazards.push(h); hazAt.set(y * W + x, h); };
+  for (const r of rooms) {
+    if (r.type !== 'battle' && r.type !== 'boss') continue;
+    if (r.type === 'battle' && rng() < 0.75) {
+      for (let k = 0; k < ri(1, 3); k++) {
+        const horiz = rng() < 0.5, len = ri(2, 4), bx = ri(r.x0 + 2, r.x1 - 2 - (horiz ? len : 0)), by = ri(r.y0 + 2, r.y1 - 2 - (horiz ? 0 : len));
+        for (let i = 0; i < len; i++) { const x = bx + (horiz ? i : 0), y = by + (horiz ? 0 : i); if (free(x, y, r)) addHaz(x, y, 'spike', r.i); }
+      }
+    }
+    const pools = r.type === 'boss' ? (biomeIdx === 2 ? 4 : 2) : (rng() < 0.65 ? ri(1, 2) : 0);
+    for (let k = 0; k < pools; k++) {
+      const pw = ri(2, 3), ph = ri(2, 3), bx = ri(r.x0 + 2, r.x1 - 2 - pw), by = ri(r.y0 + 2, r.y1 - 2 - ph);
+      for (let y = by; y < by + ph; y++) for (let x = bx; x < bx + pw; x++) {
+        if ((x === bx || x === bx + pw - 1) && (y === by || y === by + ph - 1) && rng() < 0.5) continue;
+        if (free(x, y, r)) addHaz(x, y, poolType, r.i);
+      }
+    }
+  }
+  // 4) 벽 횃불 (방 윗벽)
+  const torches = [];
+  for (const r of rooms) {
+    let x = r.x0 + ri(1, 3);
+    while (x < r.x1) {
+      if (tiles[(r.y0 - 1) * W + x] === 0) torches.push({ x, y: r.y0 - 1, ph: rng() * 6 });
+      x += ri(4, 6);
+    }
+  }
+
   // 바닥 장식 시드
   const deco = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) deco[i] = Math.floor(rng() * 256);
 
-  return { seed, L, W, H, tiles, rooms, corridors, crates, crateAt, deco, biome, biomeIdx, isBoss,
+  return { seed, L, W, H, tiles, rooms, corridors, crates, crateAt, deco, biome, biomeIdx, isBoss, hazards, hazAt, torches,
     start: rooms.find(r => r.type === 'start') };
 }
 
@@ -226,33 +267,101 @@ function setDoors(M, r, closed) { for (const [x, y] of r.doors) M.tiles[y * M.W 
 function renderFloor(M) {
   const c = document.createElement('canvas'); c.width = M.W * TILE; c.height = M.H * TILE;
   const g = c.getContext('2d');
-  const B = M.biome;
-  g.fillStyle = '#0b0910'; g.fillRect(0, 0, c.width, c.height);
+  const B = M.biome, bi = M.biomeIdx;
+  g.fillStyle = '#07050c'; g.fillRect(0, 0, c.width, c.height);
   const isFloor = (x, y) => tileAt(M, x, y) !== 0;
+  const roomType = new Map();
+  for (const r of M.rooms) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) roomType.set(y * M.W + x, r);
+  const P = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
   for (let y = 0; y < M.H; y++) for (let x = 0; x < M.W; x++) {
-    const px = x * TILE, py = y * TILE, d = M.deco[y * M.W + x];
+    const px = x * TILE, py = y * TILE, d = M.deco[y * M.W + x], d2 = M.deco[(y * M.W + x + 7) % M.deco.length];
     if (isFloor(x, y)) {
-      g.fillStyle = B.floor[((x + y) & 1) ? 0 : 1]; g.fillRect(px, py, TILE, TILE);
-      g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(px, py + TILE - 1, TILE, 1); g.fillRect(px + TILE - 1, py, 1, TILE);
-      if (d < 40) { g.fillStyle = B.floor[2]; g.fillRect(px + (d % 12), py + ((d >> 3) % 12), 3, 2); }
-      if (d > 248) { g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(px + 4, py + 5, 2, 2); g.fillRect(px + 9, py + 10, 2, 1); }
-      if (M.biomeIdx === 0 && d > 236 && d <= 248) { g.fillStyle = '#5f8f4a'; g.fillRect(px + 6, py + 8, 1, 3); g.fillRect(px + 8, py + 7, 1, 4); g.fillRect(px + 10, py + 9, 1, 2); }
-      if (M.biomeIdx === 2 && d > 240 && d <= 248) { g.fillStyle = '#ff6a2a'; g.fillRect(px + 3, py + 11, 6, 1); g.fillRect(px + 8, py + 10, 3, 1); }
-      // 벽 아래 그림자
-      if (!isFloor(x, y - 1)) { g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(px, py, TILE, 5); }
+      const r = roomType.get(y * M.W + x);
+      // 기본 타일: 큰 판석 느낌 (2x2 묶음마다 색이 살짝 다름)
+      const big = ((x >> 1) + (y >> 1)) & 1;
+      P(px, py, TILE, TILE, B.floor[big ? 0 : 1]);
+      P(px, py, TILE, 1, shade(B.floor[big ? 0 : 1], 0.06));
+      P(px, py + TILE - 1, TILE, 1, 'rgba(0,0,0,0.18)'); P(px + TILE - 1, py, 1, TILE, 'rgba(0,0,0,0.14)');
+      if (d < 26) P(px + (d % 11) + 1, py + ((d >> 3) % 11) + 1, 3, 2, B.floor[2]);
+      if (d > 250) { P(px + 4, py + 5, 2, 2, 'rgba(255,255,255,0.07)'); P(px + 9, py + 10, 2, 1, 'rgba(255,255,255,0.07)'); }
+      // 금
+      if (d2 < 10) { P(px + 3, py + 6, 5, 1, 'rgba(0,0,0,0.3)'); P(px + 7, py + 7, 4, 1, 'rgba(0,0,0,0.3)'); P(px + 10, py + 8, 1, 3, 'rgba(0,0,0,0.3)'); }
+      // 지역 장식
+      if (bi === 0) {
+        if (d > 230 && d <= 250) { P(px + 5, py + 9, 1, 3, '#6fa04a'); P(px + 7, py + 8, 1, 4, '#5f8f3a'); P(px + 9, py + 10, 1, 2, '#7fb05a'); }
+        if (d2 > 248) { P(px + 6, py + 6, 3, 3, '#e0d070'); P(px + 7, py + 5, 1, 1, '#fff'); P(px + 7, py + 9, 1, 3, '#4a7a3a'); }
+        if (d2 > 240 && d2 <= 244) { P(px + 3, py + 4, 8, 6, 'rgba(60,90,40,0.5)'); }
+      } else if (bi === 1) {
+        if (d > 236 && d <= 250) { P(px + 6, py + 6, 2, 5, '#bfe8ff'); P(px + 5, py + 8, 1, 3, '#8fc8f0'); P(px + 8, py + 9, 1, 2, '#dff4ff'); }
+        if (d2 > 244) { P(px + 2, py + 3, 10, 7, 'rgba(200,230,255,0.12)'); }
+      } else {
+        if (d > 238 && d <= 250) { P(px + 3, py + 11, 7, 1, '#ff6a2a'); P(px + 9, py + 10, 3, 1, '#ffb03a'); P(px + 5, py + 12, 2, 1, '#c43a1a'); }
+        if (d2 > 246) { P(px + 4, py + 6, 6, 4, '#3a2020'); P(px + 5, py + 7, 4, 2, '#5a2a1a'); }
+      }
+      // 뼈·해골 (드물게)
+      if (d2 > 252 && (!r || r.type === 'battle')) { P(px + 4, py + 8, 7, 2, '#e8e2d0'); P(px + 3, py + 7, 2, 4, '#e8e2d0'); P(px + 10, py + 7, 2, 4, '#e8e2d0'); }
+      if (d === 7 && (!r || r.type === 'battle')) { P(px + 5, py + 5, 6, 5, '#e8e2d0'); P(px + 6, py + 7, 1, 1, '#2a1a1a'); P(px + 9, py + 7, 1, 1, '#2a1a1a'); P(px + 6, py + 10, 4, 1, '#c8c2b0'); }
+      // 특수 방 바닥
+      if (r && (r.type === 'shop' || r.type === 'statue' || r.type === 'chest' || r.type === 'forge' || r.type === 'start')) {
+        const lx = x - r.x0, ly = y - r.y0, w = r.x1 - r.x0, h = r.y1 - r.y0;
+        if (r.type === 'shop' && lx >= 2 && lx <= w - 2 && ly >= 3 && ly <= h - 2) {
+          P(px, py, TILE, TILE, (lx + ly) & 1 ? '#7a2a3a' : '#8a3444');
+          if (lx === 2 || lx === w - 2) P(px + (lx === 2 ? 0 : 13), py, 3, TILE, '#d9b04a');
+          if (ly === 3 || ly === h - 2) P(px, py + (ly === 3 ? 0 : 13), TILE, 3, '#d9b04a');
+        }
+        if (r.type === 'chest' && lx >= 3 && lx <= w - 3 && ly >= 3 && ly <= h - 3) {
+          P(px, py, TILE, TILE, '#3a3a6a'); P(px + 1, py + 1, TILE - 2, TILE - 2, '#44447a');
+          if ((lx + ly) % 2 === 0) P(px + 6, py + 6, 4, 4, '#d9b04a');
+        }
+        if (r.type === 'statue') {
+          const dd = Math.hypot(lx - w / 2, ly - h / 2);
+          if (dd < 4.2) { P(px, py, TILE, TILE, dd < 2.2 ? '#5a5470' : '#4a4460'); P(px, py, TILE, 1, 'rgba(255,255,255,0.08)'); }
+          if (Math.abs(dd - 3.6) < 0.5) P(px + 6, py + 6, 4, 4, '#9fe8ff');
+        }
+        if (r.type === 'forge') {
+          if (ly <= 4 && lx >= 2 && lx <= w - 2) { P(px, py, TILE, TILE, (lx + ly) & 1 ? '#3a3a44' : '#44444f'); P(px + 2, py + 2, 2, 2, '#6a6a7a'); P(px + 12, py + 12, 2, 2, '#6a6a7a'); }
+          if (ly === 5 && lx >= 2 && lx <= w - 2) { P(px, py + 5, TILE, 6, '#3a1a12'); P(px, py + 6, TILE, 4, '#c43a1a'); P(px, py + 7, TILE, 2, '#ff8a2a'); if (d % 3 === 0) P(px + (d % 12), py + 7, 3, 1, '#ffd23a'); }
+        }
+        if (r.type === 'start' && Math.abs(lx - w / 2) <= 1 && Math.abs(ly - h / 2) <= 1) { P(px + 1, py + 1, 14, 14, 'rgba(160,140,255,0.12)'); }
+      }
+      // 웅덩이
+      const hz = M.hazAt.get(y * M.W + x);
+      if (hz && hz.t !== 'spike') {
+        const col = hz.t === 'lava' ? ['#c43a1a', '#ff7a2a', '#ffd23a'] : hz.t === 'ice' ? ['#7ab0e0', '#b8e0ff', '#ffffff'] : ['#3a7a2a', '#6ac04a', '#c0ff8a'];
+        const nb = (dx, dy) => { const h2 = M.hazAt.get((y + dy) * M.W + x + dx); return h2 && h2.t === hz.t; };
+        P(px, py, TILE, TILE, col[0]);
+        P(px + 1, py + 1, TILE - 2, TILE - 2, col[1]);
+        if (!nb(0, -1)) P(px, py, TILE, 2, shade(col[0], -0.3));
+        if (!nb(-1, 0)) P(px, py, 2, TILE, shade(col[0], -0.2));
+        if (!nb(1, 0)) P(px + TILE - 2, py, 2, TILE, shade(col[0], -0.2));
+        if (!nb(0, 1)) P(px, py + TILE - 2, TILE, 2, shade(col[0], 0.1));
+        P(px + (d % 8) + 2, py + (d2 % 8) + 3, 3, 1, col[2]);
+        if (hz.t === 'ice') { P(px + 3, py + 3, 1, 5, '#ffffff'); P(px + 4, py + 3, 3, 1, '#ffffff'); }
+      }
+      if (!isFloor(x, y - 1)) P(px, py, TILE, 5, 'rgba(0,0,0,0.38)');
+      if (!isFloor(x - 1, y)) P(px, py, 3, TILE, 'rgba(0,0,0,0.18)');
     } else {
       let near = false;
       for (let yy = -1; yy <= 1 && !near; yy++) for (let xx = -1; xx <= 1; xx++) if (isFloor(x + xx, y + yy)) { near = true; break; }
       if (!near) continue;
-      g.fillStyle = B.wallTop; g.fillRect(px, py, TILE, TILE);
-      g.fillStyle = shade(B.wallTop, -0.15); g.fillRect(px, py + TILE - 2, TILE, 2);
-      if (!isFloor(x - 1, y)) {} else { g.fillStyle = shade(B.wallTop, -0.25); g.fillRect(px, py, 1, TILE); }
-      if (isFloor(x + 1, y)) { g.fillStyle = shade(B.wallTop, -0.25); g.fillRect(px + TILE - 1, py, 1, TILE); }
-      if (isFloor(x, y + 1)) { // 앞면
-        g.fillStyle = B.wall; g.fillRect(px, py + 6, TILE, 10);
-        g.fillStyle = shade(B.wall, -0.3); g.fillRect(px, py + 10, TILE, 1); g.fillRect(px + ((x & 1) ? 4 : 11), py + 6, 1, 4); g.fillRect(px + ((x & 1) ? 10 : 2), py + 11, 1, 5);
-        g.fillStyle = shade(B.wall, 0.25); g.fillRect(px, py + 6, TILE, 1);
-        if (d < 18) { g.fillStyle = M.biomeIdx === 1 ? '#bfe8ff' : M.biomeIdx === 2 ? '#ff7a2a' : '#7fbf5a'; g.fillRect(px + 6, py + 7, 3, 3); }
+      const top = B.wallTop;
+      P(px, py, TILE, TILE, top);
+      // 윗면 돌 무늬
+      P(px + ((x * 5 + y * 3) % 9) + 2, py + 3, 4, 1, shade(top, -0.12));
+      P(px + ((x * 7 + y) % 8) + 3, py + 9, 5, 1, shade(top, -0.12));
+      P(px, py, TILE, 1, shade(top, 0.12));
+      if (isFloor(x - 1, y)) P(px, py, 1, TILE, shade(top, -0.3));
+      if (isFloor(x + 1, y)) P(px + TILE - 1, py, 1, TILE, shade(top, -0.3));
+      if (isFloor(x, y - 1)) P(px, py, TILE, 2, shade(top, -0.25));
+      if (isFloor(x, y + 1)) { // 앞면 (벽돌)
+        const wc = B.wall;
+        P(px, py + 5, TILE, 11, wc);
+        P(px, py + 5, TILE, 1, shade(wc, 0.3));
+        P(px, py + 9, TILE, 1, shade(wc, -0.3)); P(px, py + 13, TILE, 1, shade(wc, -0.3));
+        P(px + ((x & 1) ? 4 : 11), py + 6, 1, 3, shade(wc, -0.3)); P(px + ((x & 1) ? 10 : 3), py + 10, 1, 3, shade(wc, -0.3)); P(px + ((x & 1) ? 6 : 13), py + 14, 1, 2, shade(wc, -0.3));
+        P(px, py + 15, TILE, 1, 'rgba(0,0,0,0.5)');
+        if (d < 30) { const mc = bi === 1 ? '#dff4ff' : bi === 2 ? '#ff7a2a' : '#6fa04a'; P(px + 2 + (d % 9), py + 6, 3, 2 + (d % 3), mc); }
+        if (d > 245) P(px + 5, py + 7, 6, 6, shade(wc, -0.45));
       }
     }
   }
