@@ -55,6 +55,7 @@ input { font-family: inherit; font-size: 16px; user-select: text; -webkit-user-s
 .toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 4px; border-bottom: 2px solid #2c2442; font-size: 15px; }
 .toggle small { display: block; color: var(--dim); font-size: 11px; margin-top: 3px; }
 .toggle input[type=checkbox] { width: 26px; height: 26px; accent-color: var(--acc); }
+.toggle select { font-family: inherit; font-size: 16px; color: var(--txt); background: #120e1c; border: 2px solid var(--edge); padding: 4px 8px; }
 #server { width: 100%; background: #120e1c; border: 2px solid var(--edge); color: var(--txt); padding: 8px; margin-top: 6px; }
 
 /* 대기실 */
@@ -223,6 +224,7 @@ input { font-family: inherit; font-size: 16px; user-select: text; -webkit-user-s
     <h3>설정</h3>
     <label class="toggle"><span>자동 사격<small>적이 보이면 버튼을 안 눌러도 쏴요</small></span><input type="checkbox" id="t-autofire"></label>
     <label class="toggle"><span>효과음</span><input type="checkbox" id="t-sound"></label>
+    <label class="toggle"><span>화면 흔들림</span><select id="t-shake"><option value="normal">보통</option><option value="low">약하게</option><option value="off">끄기</option></select></label>
     <div class="toggle" style="display:block"><span>서버 주소<small>비워 두면 기본 서버를 써요</small></span><input id="server" type="url" inputmode="url" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
     <button class="btn" id="b-set-back" style="margin-top:12px">저장하고 뒤로</button>
   </div>
@@ -240,6 +242,7 @@ input { font-family: inherit; font-size: 16px; user-select: text; -webkit-user-s
 <div class="ov" id="pause"><div class="card px">
   <h3>일시정지</h3>
   <label class="toggle"><span>자동 사격</span><input type="checkbox" id="t-autofire2"></label>
+  <label class="toggle"><span>화면 흔들림</span><select id="t-shake2"><option value="normal">보통</option><option value="low">약하게</option><option value="off">끄기</option></select></label>
   <button class="btn main" id="b-resume">계속하기</button>
   <button class="btn" id="b-quit">메뉴로 나가기</button>
 </div></div>

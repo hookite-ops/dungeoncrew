@@ -168,7 +168,7 @@ const Input = (() => {
 
 // ---------- 화면 ----------
 const UI = {
-  hero: 0, scale: 2, dpr: 1, settings: { autofire: false, sound: true, server: '' },
+  hero: 0, scale: 2, dpr: 1, settings: { autofire: false, sound: true, server: '', shake: 'low' },
   init() {
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem('dc_settings') || '{}')); } catch (e) {}
     try { G.name = localStorage.getItem('dc_name') || ('모험가' + Math.floor(Math.random() * 900 + 100)); this.hero = +(localStorage.getItem('dc_hero') || 0); } catch (e) {}
@@ -223,7 +223,7 @@ const UI = {
       el.appendChild(b);
     });
   },
-  fillSettings() { $('#t-autofire').checked = this.settings.autofire; $('#t-sound').checked = this.settings.sound; $('#server').value = this.settings.server || ''; $('#server').placeholder = DEFAULT_SERVER; },
+  fillSettings() { $('#t-shake').value = this.settings.shake; $('#t-autofire').checked = this.settings.autofire; $('#t-sound').checked = this.settings.sound; $('#server').value = this.settings.server || ''; $('#server').placeholder = DEFAULT_SERVER; },
   readSettings() { this.settings.server = $('#server').value.trim(); this.save(); },
   show(name) {
     document.querySelectorAll('.scr').forEach(s => s.classList.remove('on'));
@@ -288,7 +288,7 @@ const UI = {
   leaveGame() { $('#buffpick').classList.remove('on'); this._buffQ = 0; clearTimeout(G._buffT); Input.reset(); G.paused = false; clearTimeout(this._overT); $('#hud').classList.remove('on'); $('#touch').classList.remove('on'); $('#pause').classList.remove('on'); $('#over').classList.remove('on'); },
   pause(on) {
     $('#pause').classList.toggle('on', on);
-    $('#t-autofire2').checked = this.settings.autofire;
+    $('#t-autofire2').checked = this.settings.autofire; $('#t-shake2').value = this.settings.shake;
     G.paused = on && !G.online;
   },
   showOver(st) {
@@ -446,4 +446,5 @@ window.addEventListener('load', () => {
   document.addEventListener('visibilitychange', () => { if (document.hidden && G.mode === 'play' && !G.online) UI.pause(true); });
   document.addEventListener('contextmenu', e => e.preventDefault());
   $('#t-autofire2').addEventListener('change', e => { UI.settings.autofire = e.target.checked; UI.save(); });
+  for (const id of ['#t-shake', '#t-shake2']) $(id).addEventListener('change', e => { UI.settings.shake = e.target.value; UI.save(); });
 });

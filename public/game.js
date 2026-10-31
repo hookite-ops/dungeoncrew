@@ -884,7 +884,7 @@ function localUpdate(dt) {
       if (!w.melee && !w.flame && !['staff', 'launcher', 'bow', 'cards', 'crossbow', 'boomer', 'acid'].includes(w.shape))
         G.fx.push({ k: 'part', x: hx, y: hy - 3, vx: -p.face * rnd(30, 60), vy: rnd(-90, -60), t: 0, d: 0.45, col: '#e8c050', s: 1, g: 420 });
       SFX.shoot(w);
-      if (!w.melee) { G.fx.push({ k: 'muzzle', x: hx + Math.cos(p.a) * 11, y: hy + Math.sin(p.a) * 11, t: 0, d: 0.06, col: w.col }); G.shake = Math.max(G.shake, w.big ? 3 : w.dmg > 10 ? 2.5 : 0.6); }
+      if (!w.melee) { G.fx.push({ k: 'muzzle', x: hx + Math.cos(p.a) * 11, y: hy + Math.sin(p.a) * 11, t: 0, d: 0.06, col: w.col }); if (w.big) G.shake = Math.max(G.shake, 1.5); }
       ME.recoil = 2;
     } else if (inp.firePressed) { UI.toast('에너지가 부족해요! 소모 없는 무기로 바꿔 보세요'); }
   }
@@ -896,7 +896,7 @@ function localUpdate(dt) {
   }
   // 피격 느낌
   const hpar = p.hp + p.ar;
-  if (ME.lastHpAr >= 0 && hpar < ME.lastHpAr) { G.shake = Math.max(G.shake, 5); G.flash = 0.25; SFX.hurt(); if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {} }
+  if (ME.lastHpAr >= 0 && hpar < ME.lastHpAr) { G.shake = Math.max(G.shake, 3); G.flash = 0.25; SFX.hurt(); if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {} }
   ME.lastHpAr = hpar;
   // 방 발견 (미니맵)
   const r = roomAtPx(G.M, p.x, p.y);
@@ -999,10 +999,13 @@ function render(ctx, lc, lctx, scale) {
   const M = G.M, me = G.players.get(G.me);
   if (!M || !me) return;
   // 카메라
-  const lead = 16;
-  const tx = me.x + Math.cos(me.a) * lead, ty = me.y + Math.sin(me.a) * lead;
-  G.camX += (tx - G.camX) * 0.12; G.camY += (ty - G.camY) * 0.12;
-  const sx = G.shake ? rnd(-G.shake, G.shake) * 0.5 : 0, sy = G.shake ? rnd(-G.shake, G.shake) * 0.5 : 0;
+  const now = performance.now(), rdt = Math.min(0.05, ((now - (render._t || now)) / 1000) || 0.016); render._t = now;
+  const vl = Math.hypot(ME.vx, ME.vy) || 1, mv = Math.min(1, vl / 60);
+  const tx = me.x + (ME.vx / vl) * 10 * mv, ty = me.y + (ME.vy / vl) * 10 * mv;
+  const ck = 1 - Math.exp(-rdt * 5);
+  G.camX += (tx - G.camX) * ck; G.camY += (ty - G.camY) * ck;
+  const amp = Math.min(G.shake, 6) * ({ normal: 0.5, low: 0.25, off: 0 }[UI.settings.shake] ?? 0.25);
+  const sx = amp ? Math.sin(G.time * 53) * amp : 0, sy = amp ? Math.cos(G.time * 41) * amp : 0;
   const cx = Math.round(G.camX - VW / 2 + sx), cy = Math.round(G.camY - VH / 2 + sy);
   const g = lctx;
   g.fillStyle = '#0b0910'; g.fillRect(0, 0, VW, VH);
