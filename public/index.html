@@ -2,65 +2,75 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <meta name="theme-color" content="#120e1c">
 <title>던전 크루</title>
 <style>
-@font-face { font-family: Galmuri11; src: url(fonts/Galmuri11.woff2) format('woff2'); font-weight: 400; }
-@font-face { font-family: Galmuri11; src: url(fonts/Galmuri11-Bold.woff2) format('woff2'); font-weight: 700; }
-:root { --bg: #120e1c; --panel: #221b33; --edge: #0a0812; --hi: #ffe08a; --txt: #f2ecff; --dim: #9a90b8; --acc: #ff5d73; --ok: #6fdc6a; }
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--txt); font-family: Galmuri11, monospace; overflow: hidden; overscroll-behavior: none; touch-action: none; }
-#cv { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; image-rendering: pixelated; }
-button { font-family: inherit; color: inherit; border: 0; cursor: pointer; }
-input { font-family: inherit; user-select: text; -webkit-user-select: text; }
+@font-face { font-family: Galmuri11; src: url(fonts/Galmuri11.woff2) format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: Galmuri11; src: url(fonts/Galmuri11-Bold.woff2) format('woff2'); font-weight: 700; font-display: swap; }
+:root { --bg: #120e1c; --panel: #221b33; --edge: #0a0812; --hi: #ffe08a; --txt: #f2ecff; --dim: #9a90b8; --acc: #ff5d73; --ok: #6fdc6a;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --u: 1vh; --sb: env(safe-area-inset-bottom, 0px); --sr: env(safe-area-inset-right, 0px); }
+@supports (height: 1dvh) { :root { --u: 1dvh; } }
+* { box-sizing: border-box; }
+html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--txt); font-family: Galmuri11, monospace; overflow: hidden; overscroll-behavior: none; touch-action: manipulation; }
+#cv { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; image-rendering: pixelated; touch-action: none; }
+button, .tbtn, .hero, .room, canvas, #hud, #touch, .logo, .bar, label { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+button { font-family: inherit; color: inherit; border: 0; cursor: pointer; touch-action: manipulation; }
+input { font-family: inherit; font-size: 16px; user-select: text; -webkit-user-select: text; }
 .px { background: var(--panel); border: 3px solid var(--edge); box-shadow: inset 0 3px 0 rgba(255,255,255,.08), inset 0 -3px 0 rgba(0,0,0,.35), 0 4px 0 rgba(0,0,0,.4); }
-.btn { display: block; width: 100%; padding: 12px 14px; font-size: 16px; font-weight: 700; background: #3a2f56; border: 3px solid var(--edge); box-shadow: inset 0 3px 0 rgba(255,255,255,.12), inset 0 -4px 0 rgba(0,0,0,.35); text-shadow: 0 2px 0 rgba(0,0,0,.5); }
-.btn:active { transform: translateY(2px); box-shadow: inset 0 3px 0 rgba(255,255,255,.08), inset 0 -1px 0 rgba(0,0,0,.35); }
+.btn { display: block; width: 100%; padding: 12px 14px; font-size: 16px; font-weight: 700; background: #3a2f56; border: 3px solid var(--edge); box-shadow: inset 0 3px 0 rgba(255,255,255,.12), inset 0 -4px 0 rgba(0,0,0,.35); text-shadow: 0 2px 0 rgba(0,0,0,.5); transition: transform 120ms var(--ease-out); }
+.btn:active { transform: scale(0.97); }
 .btn.main { background: #d9445e; }
 .btn.gold { background: #c98a1e; }
 .btn:disabled { opacity: .55; }
+.btn:disabled:active { transform: none; }
+@media (hover: hover) and (pointer: fine) { .btn:not(:disabled):hover, .room:hover, .hero:hover { filter: brightness(1.12); } }
 .dim { color: var(--dim); font-size: 13px; padding: 8px; }
 
 /* 화면들 */
 .scr { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); z-index: 20; }
 .scr.on { display: flex; }
+.scr.on > * { transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out); }
+@starting-style { .scr.on > * { opacity: 0; transform: translateY(8px); } }
 #scr-menu .wrap { display: flex; gap: 28px; align-items: center; max-width: 820px; width: 100%; }
 .logo { flex: 1.2; text-align: center; }
-.logo h1 { margin: 0; font-size: clamp(30px, 7vh, 56px); line-height: 1.05; color: var(--hi); text-shadow: 0 4px 0 #a0582a, 0 8px 0 rgba(0,0,0,.5); letter-spacing: 2px; }
-.logo h2 { margin: 6px 0 0; font-size: clamp(12px, 2.6vh, 16px); color: #c9b8ff; letter-spacing: 6px; }
+.logo h1 { margin: 0; font-size: clamp(30px, calc(var(--u) * 7), 56px); line-height: 1.05; color: var(--hi); text-shadow: 0 4px 0 #a0582a, 0 8px 0 rgba(0,0,0,.5); letter-spacing: 2px; }
+.logo h2 { margin: 6px 0 0; font-size: clamp(12px, calc(var(--u) * 2.6), 16px); color: #c9b8ff; letter-spacing: 6px; }
 #menu-heroes { display: flex; gap: 14px; justify-content: center; margin-top: 18px; }
 #menu-heroes canvas { width: 42px; image-rendering: pixelated; animation: bob 1s steps(2) infinite; }
 #menu-heroes canvas:nth-child(2) { animation-delay: .25s } #menu-heroes canvas:nth-child(3) { animation-delay: .5s } #menu-heroes canvas:nth-child(4) { animation-delay: .75s }
 @keyframes bob { 50% { transform: translateY(-3px); } }
 .menu-col { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 230px; max-width: 300px; }
 .field { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 13px; color: var(--dim); }
-.field input { flex: 1; min-width: 0; background: #120e1c; border: 2px solid var(--edge); color: var(--txt); padding: 7px 8px; font-size: 15px; }
-.card { padding: 16px; width: min(560px, 100%); max-height: 100%; overflow: auto; }
+.field input { flex: 1; min-width: 0; background: #120e1c; border: 2px solid var(--edge); color: var(--txt); padding: 7px 8px; }
+.card { padding: 16px; width: min(560px, 100%); max-height: 100%; overflow: auto; overscroll-behavior: contain; touch-action: pan-y; }
 .card h3 { margin: 0 0 12px; color: var(--hi); font-size: 18px; }
 .row { display: flex; gap: 8px; margin-bottom: 10px; }
-#code { flex: 1; font-size: 26px; letter-spacing: 10px; text-align: center; background: #120e1c; border: 3px solid var(--edge); color: var(--hi); padding: 8px; min-width: 0; }
-#room-list { display: flex; flex-direction: column; gap: 6px; max-height: 34vh; overflow: auto; margin-bottom: 10px; }
-.room { display: flex; gap: 12px; align-items: center; padding: 10px 12px; background: #2c2442; border: 2px solid var(--edge); text-align: left; font-size: 14px; }
+#code { flex: 1; font-size: 26px; letter-spacing: 10px; text-align: center; background: #120e1c; border: 3px solid var(--edge); color: var(--hi); padding: 8px; min-width: 0; text-transform: uppercase; }
+#room-list { display: flex; flex-direction: column; gap: 6px; max-height: calc(var(--u) * 34); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; margin-bottom: 10px; }
+.room { display: flex; gap: 12px; align-items: center; padding: 10px 12px; background: #2c2442; border: 2px solid var(--edge); text-align: left; font-size: 14px; transition: transform 120ms var(--ease-out); }
+.room:active { transform: scale(0.98); }
 .room b { color: var(--hi); letter-spacing: 3px; font-size: 17px; } .room span { flex: 1; } .room em { font-style: normal; color: var(--ok); }
 .toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 4px; border-bottom: 2px solid #2c2442; font-size: 15px; }
 .toggle small { display: block; color: var(--dim); font-size: 11px; margin-top: 3px; }
 .toggle input[type=checkbox] { width: 26px; height: 26px; accent-color: var(--acc); }
-#server { width: 100%; background: #120e1c; border: 2px solid var(--edge); color: var(--txt); padding: 8px; font-size: 12px; margin-top: 6px; }
+#server { width: 100%; background: #120e1c; border: 2px solid var(--edge); color: var(--txt); padding: 8px; margin-top: 6px; }
 
 /* 대기실 */
 #scr-lobby .card { width: min(900px, 100%); padding: 12px 14px; }
 .lobby-top { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .lobby-top h3 { margin: 0; flex: 1; }
 #lobby-code-box { font-size: 13px; color: var(--dim); }
-#lobby-code { color: var(--hi); font-size: 24px; letter-spacing: 6px; margin-left: 6px; }
+#lobby-code { color: var(--hi); font-size: 24px; letter-spacing: 6px; margin-left: 6px; user-select: text; -webkit-user-select: text; }
 #lobby-players { display: flex; gap: 6px; margin-bottom: 8px; }
 .slot { flex: 1; display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: #2c2442; border: 2px solid var(--edge); font-size: 12px; min-width: 0; }
 .slot span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slot canvas { width: 22px; image-rendering: pixelated; }
 .slot.empty { opacity: .45; justify-content: center; }
 #hero-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
-.hero { padding: 8px 8px 10px; background: #2c2442; border: 3px solid var(--edge); text-align: center; font-size: 11px; position: relative; }
+.hero { padding: 8px 8px 10px; background: #2c2442; border: 3px solid var(--edge); text-align: center; font-size: 11px; position: relative; transition: transform 120ms var(--ease-out); }
+.hero:active { transform: scale(0.97); }
 .hero.sel { background: #3d3160; border-color: var(--hi); box-shadow: 0 0 0 2px #a0582a, 0 0 18px rgba(255,224,138,.35); }
 .hero canvas { width: 46px; image-rendering: pixelated; margin: 2px auto 2px; display: block; }
 .hero.sel canvas { animation: bob .6s steps(2) infinite; }
@@ -74,28 +84,28 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 #hud { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 10; }
 #hud.on { display: block; }
 #stats { position: absolute; left: max(10px, env(safe-area-inset-left)); top: max(8px, env(safe-area-inset-top)); padding: 6px 8px; width: 190px; }
-.bar { position: relative; height: 15px; background: #120e1c; border: 2px solid var(--edge); margin: 3px 0; }
-.bar i { position: absolute; left: 0; top: 0; bottom: 0; transition: width .15s; }
-.bar b { position: absolute; inset: 0; font-size: 11px; line-height: 12px; text-align: center; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
-.bar em { position: absolute; left: -2px; top: -4px; font-style: normal; font-size: 13px; z-index: 2; }
+.bar { position: relative; height: 15px; background: #120e1c; border: 2px solid var(--edge); margin: 3px 0; overflow: hidden; }
+.bar i { position: absolute; inset: 0; transform-origin: left center; transition: transform 150ms var(--ease-out); }
+.bar b { position: absolute; inset: 0; padding-left: 10px; font-size: 11px; line-height: 12px; text-align: center; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.bar em { position: absolute; left: 1px; top: -2px; font-style: normal; font-size: 11px; z-index: 2; }
 #bar-hp i { background: linear-gradient(#ff7a8a, #d9304a); } #bar-ar i { background: linear-gradient(#e0e6f0, #8a94a8); } #bar-en i { background: linear-gradient(#7ac0ff, #2a6ad9); }
-.bar { padding-left: 0; } .bar b { padding-left: 10px; }
 #coins-row { display: flex; justify-content: space-between; font-size: 12px; margin-top: 3px; color: var(--hi); }
 #team { margin-top: 4px; }
 .mate { font-size: 10px; display: flex; align-items: center; gap: 4px; margin-top: 2px; } .mate span { width: 70px; overflow: hidden; white-space: nowrap; }
-.mate i { height: 4px; background: #ff5a6a; display: block; max-width: 80px; } .mate.down span::after { content: ' ✖'; color: #ff5a6a; }
+.mate i { height: 4px; width: 80px; background: #ff5a6a; display: block; transform-origin: left center; } .mate.down span::after { content: ' ✖'; color: #ff5a6a; }
 #topc { position: absolute; left: 50%; top: max(8px, env(safe-area-inset-top)); transform: translateX(-50%); text-align: center; }
 #lvl { display: inline-block; padding: 3px 12px; font-size: 14px; color: var(--hi); }
 #boss { display: none; width: min(46vw, 420px); margin-top: 6px; }
 #boss.on { display: block; }
 #boss b { display: block; font-size: 13px; color: #ff8a9a; text-shadow: 0 2px 0 #000; margin-bottom: 2px; }
-#boss div { height: 12px; background: #120e1c; border: 2px solid var(--edge); } #boss i { display: block; height: 100%; background: linear-gradient(#ff5a5a, #a01a2a); transition: width .2s; }
+#boss div { height: 12px; background: #120e1c; border: 2px solid var(--edge); overflow: hidden; } #boss i { display: block; height: 100%; background: linear-gradient(#ff5a5a, #a01a2a); transform-origin: left center; transition: transform 200ms var(--ease-out); }
 #mapbox { position: absolute; right: max(10px, env(safe-area-inset-right)); top: max(8px, env(safe-area-inset-top)); display: flex; gap: 6px; align-items: flex-start; }
 #minimap { width: 120px; height: 84px; border: 3px solid var(--edge); image-rendering: pixelated; }
-#btn-pause { pointer-events: auto; width: 40px; height: 40px; font-size: 16px; background: #2c2442; border: 3px solid var(--edge); }
-#banner { position: absolute; left: 0; right: 0; top: 26%; text-align: center; opacity: 0; transition: opacity .4s; }
-#banner.on { opacity: 1; }
-#banner-t { font-size: clamp(22px, 5.5vh, 40px); color: var(--hi); text-shadow: 0 3px 0 #a0582a, 0 6px 0 rgba(0,0,0,.6); }
+#btn-pause { pointer-events: auto; width: 44px; height: 44px; font-size: 16px; background: #2c2442; border: 3px solid var(--edge); transition: transform 120ms var(--ease-out); }
+#btn-pause:active { transform: scale(0.94); }
+#banner { position: absolute; left: 0; right: 0; top: 26%; text-align: center; opacity: 0; transform: translateY(6px); transition: opacity 200ms ease, transform 200ms ease; }
+#banner.on { opacity: 1; transform: none; transition: opacity 300ms var(--ease-out), transform 300ms var(--ease-out); }
+#banner-t { font-size: clamp(22px, calc(var(--u) * 5.5), 40px); color: var(--hi); text-shadow: 0 3px 0 #a0582a, 0 6px 0 rgba(0,0,0,.6); }
 #banner-s { font-size: 14px; margin-top: 6px; text-shadow: 0 2px 0 #000; }
 #down-msg { position: absolute; left: 0; right: 0; top: 40%; text-align: center; font-size: 16px; color: #ff8a8a; text-shadow: 0 2px 0 #000; display: none; }
 #down-msg.on { display: block; }
@@ -103,38 +113,48 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 /* 터치 조작 */
 #touch { position: fixed; inset: 0; z-index: 9; display: none; touch-action: none; }
 #touch.on { display: block; }
-#joy { position: absolute; border-radius: 50%; border: 3px solid rgba(255,255,255,.22); background: rgba(255,255,255,.05); pointer-events: none; opacity: .55; }
+#joy { position: absolute; left: 0; top: 0; border-radius: 50%; border: 3px solid rgba(255,255,255,.22); background: rgba(255,255,255,.05); pointer-events: none; opacity: .5; transition: opacity 120ms ease; }
 #joy.active { opacity: 1; }
 #joy-knob { position: absolute; left: 50%; top: 50%; width: 44%; height: 44%; margin: -22% 0 0 -22%; border-radius: 50%; background: rgba(255,255,255,.35); border: 3px solid rgba(255,255,255,.5); }
-.tbtn { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; border: 3px solid var(--edge); display: flex; align-items: center; justify-content: center; flex-direction: column; text-shadow: 0 2px 0 #000; }
-#btn-fire { right: max(4vw, env(safe-area-inset-right)); bottom: 30vh; width: 21vh; height: 21vh; min-width: 88px; min-height: 88px; background: radial-gradient(circle at 50% 35%, #ff7a8a, #c42a46); box-shadow: inset 0 -6px 0 rgba(0,0,0,.3), 0 4px 0 rgba(0,0,0,.4); }
-#btn-fire.down { transform: scale(.94); filter: brightness(1.2); }
+.tbtn { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; border: 3px solid var(--edge); display: flex; align-items: center; justify-content: center; flex-direction: column; text-shadow: 0 2px 0 #000; transition: transform 100ms var(--ease-out); }
+.tbtn:active, .tbtn.down { transform: scale(0.94); }
+.tbtn::after { content: ''; position: absolute; inset: -6px; border-radius: inherit; border: 3px solid rgba(255,255,255,.55); opacity: 0; pointer-events: none; }
+#btn-skill.ready::after, #btn-use.on::after { animation: ring 1.1s var(--ease-out) infinite; }
+@keyframes ring { 0% { opacity: .9; transform: scale(.92); } 100% { opacity: 0; transform: scale(1.12); } }
+#btn-fire { right: max(4vw, var(--sr)); bottom: calc(var(--u) * 30 + var(--sb)); width: calc(var(--u) * 21); height: calc(var(--u) * 21); min-width: 88px; min-height: 88px; background: radial-gradient(circle at 50% 35%, #ff7a8a, #c42a46); box-shadow: inset 0 -6px 0 rgba(0,0,0,.3), 0 4px 0 rgba(0,0,0,.4); }
+#btn-fire.down { filter: brightness(1.15); }
 #fire-icon { width: 70%; height: 38%; image-rendering: pixelated; }
 #fire-cost { font-size: 12px; color: #bfe0ff; }
 #fire-name { position: absolute; bottom: -18px; white-space: nowrap; font-size: 11px; }
-#btn-skill { right: calc(max(4vw, env(safe-area-inset-right)) + 25vh); bottom: 7vh; width: 15vh; height: 15vh; min-width: 64px; min-height: 64px; background: conic-gradient(rgba(10,8,18,.75) var(--k, 0deg), var(--c, #6f9cff) 0); font-size: 11px; box-shadow: 0 4px 0 rgba(0,0,0,.4); }
-#btn-skill.ready { animation: pulse 1s infinite; }
-@keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(255,255,255,.35), 0 4px 0 rgba(0,0,0,.4); } }
-#skill-name { font-size: 11px; padding: 0 6px; text-align: center; line-height: 1.25; word-break: keep-all; }
-#btn-swap { right: max(3vw, env(safe-area-inset-right)); bottom: 54vh; width: 13vh; height: 13vh; min-width: 56px; min-height: 56px; background: #3a2f56; border-radius: 10px; box-shadow: 0 4px 0 rgba(0,0,0,.4); }
+#btn-skill { right: calc(max(4vw, var(--sr)) + var(--u) * 25); bottom: calc(var(--u) * 7 + var(--sb)); width: calc(var(--u) * 15); height: calc(var(--u) * 15); min-width: 64px; min-height: 64px; background: var(--c, #6f9cff); font-size: 11px; box-shadow: 0 4px 0 rgba(0,0,0,.4); overflow: visible; }
+#skill-cd { position: absolute; inset: 0; border-radius: 50%; background: rgba(10,8,18,.72); opacity: 0; }
+#btn-skill:not(.ready) #skill-cd { opacity: 1; }
+#skill-name { position: relative; font-size: 11px; padding: 0 6px; text-align: center; line-height: 1.25; word-break: keep-all; }
+#skill-sec { position: relative; font-size: 14px; color: #fff; display: none; }
+#btn-skill:not(.ready) #skill-sec { display: block; }
+#btn-skill:not(.ready) #skill-name { display: none; }
+#btn-swap { right: max(3vw, var(--sr)); bottom: calc(var(--u) * 54 + var(--sb)); width: calc(var(--u) * 13); height: calc(var(--u) * 13); min-width: 56px; min-height: 56px; background: #3a2f56; border-radius: 10px; box-shadow: 0 4px 0 rgba(0,0,0,.4); }
 #btn-swap.none { opacity: .3; }
 #swap-icon { width: 80%; height: 50%; image-rendering: pixelated; }
 #btn-swap small { font-size: 10px; color: var(--dim); }
-#btn-use { right: calc(max(4vw, env(safe-area-inset-right)) + 25vh); bottom: 44vh; padding: 0 14px; height: 9vh; min-height: 40px; border-radius: 8px; background: #c98a1e; font-size: 14px; font-weight: 700; display: none; box-shadow: 0 4px 0 rgba(0,0,0,.4); animation: pulse 1s infinite; }
+#btn-use { right: calc(max(4vw, var(--sr)) + var(--u) * 25); bottom: calc(var(--u) * 44 + var(--sb)); padding: 0 14px; height: calc(var(--u) * 9); min-height: 44px; border-radius: 8px; background: #c98a1e; font-size: 14px; font-weight: 700; display: none; box-shadow: 0 4px 0 rgba(0,0,0,.4); }
 #btn-use.on { display: flex; }
 
 /* 겹치는 창 */
 .ov { position: fixed; inset: 0; z-index: 30; display: none; align-items: center; justify-content: center; background: rgba(8,6,14,.75); }
 .ov.on { display: flex; }
+.ov.on, .ov.on .card { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
+@starting-style { .ov.on { opacity: 0; } .ov.on .card { transform: scale(0.96); } }
 .ov .card { width: min(380px, 92vw); text-align: center; }
 .ov .card .btn { margin-top: 8px; }
 #over h3 { font-size: 26px; color: var(--acc); }
 #over-stats { line-height: 1.9; font-size: 15px; } #over-stats b { color: var(--hi); }
-#toast { position: fixed; left: 50%; bottom: 7vh; transform: translateX(-50%) translateY(20px); background: rgba(20,14,32,.95); border: 3px solid var(--edge); padding: 9px 16px; font-size: 13px; z-index: 50; opacity: 0; transition: .25s; pointer-events: none; max-width: 80vw; text-align: center; }
-#toast.on { opacity: 1; transform: translateX(-50%); }
+#toast { position: fixed; left: 50%; bottom: calc(var(--u) * 7 + var(--sb)); transform: translate(-50%, 12px); background: rgba(20,14,32,.95); border: 3px solid var(--edge); padding: 9px 16px; font-size: 13px; z-index: 50; opacity: 0; transition: opacity 150ms ease, transform 150ms ease; pointer-events: none; max-width: 80vw; text-align: center; }
+#toast.on { opacity: 1; transform: translate(-50%, 0); transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out); }
 #rotate { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; font-size: 16px; text-align: center; }
 #rotate div { font-size: 54px; animation: rot 1.6s infinite; }
 @keyframes rot { 50% { transform: rotate(90deg); } }
+@media (prefers-reduced-motion: reduce) { #menu-heroes canvas, .hero.sel canvas, #rotate div, .tbtn::after { animation: none !important; } .scr.on > *, .ov.on .card, #banner { transform: none !important; } }
 @media (orientation: portrait) and (max-width: 900px) { #rotate { display: flex; } }
 @media (max-height: 380px) { #hero-cards .hs small { display: none; } .hero canvas { width: 34px; } }
 </style>
@@ -157,7 +177,7 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
   <div id="down-msg">쓰러졌어요… 동료가 옆에 서 있으면 살아나요</div>
   <button class="tbtn" id="btn-swap"><canvas id="swap-icon" width="60" height="28"></canvas><small>교체</small></button>
   <button class="tbtn" id="btn-use">줍기</button>
-  <button class="tbtn" id="btn-skill"><span id="skill-name">스킬</span></button>
+  <button class="tbtn" id="btn-skill"><span id="skill-cd"></span><span id="skill-name">스킬</span><span id="skill-sec"></span></button>
   <button class="tbtn" id="btn-fire"><canvas id="fire-icon" width="60" height="28"></canvas><span id="fire-cost"></span><span id="fire-name"></span></button>
 </div>
 
@@ -165,7 +185,7 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
   <div class="wrap">
     <div class="logo"><h1>던전 크루</h1><h2>DUNGEON CREW</h2><div id="menu-heroes"></div></div>
     <div class="menu-col">
-      <div class="field px">이름 <input id="name" maxlength="10"></div>
+      <div class="field px">이름 <input id="name" maxlength="10" enterkeyhint="done" autocomplete="nickname"></div>
       <button class="btn main" id="b-solo">혼자 하기</button>
       <button class="btn gold" id="b-create">방 만들기 (온라인)</button>
       <button class="btn" id="b-join">방 참가하기</button>
@@ -177,7 +197,7 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 <div class="scr" id="scr-join">
   <div class="card px">
     <h3>방 참가하기</h3>
-    <div class="row"><input id="code" placeholder="ABCD" maxlength="4" autocomplete="off"><button class="btn main" id="b-join-go" style="width:auto">참가</button></div>
+    <div class="row"><input id="code" placeholder="ABCD" maxlength="4" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go"><button class="btn main" id="b-join-go" style="width:auto">참가</button></div>
     <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:4px"><span style="color:var(--dim);font-size:13px">열린 방 목록</span><button class="btn" id="b-refresh" style="width:auto;padding:6px 10px;font-size:12px">새로고침</button></div>
     <div id="room-list"></div>
     <button class="btn" id="b-join-back">뒤로</button>
@@ -189,7 +209,7 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
     <h3>설정</h3>
     <label class="toggle"><span>자동 사격<small>적이 보이면 버튼을 안 눌러도 쏴요</small></span><input type="checkbox" id="t-autofire"></label>
     <label class="toggle"><span>효과음</span><input type="checkbox" id="t-sound"></label>
-    <div class="toggle" style="display:block"><span>서버 주소<small>비워 두면 기본 서버를 써요</small></span><input id="server" autocomplete="off"></div>
+    <div class="toggle" style="display:block"><span>서버 주소<small>비워 두면 기본 서버를 써요</small></span><input id="server" type="url" inputmode="url" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
     <button class="btn" id="b-set-back" style="margin-top:12px">저장하고 뒤로</button>
   </div>
 </div>

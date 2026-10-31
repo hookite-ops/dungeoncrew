@@ -298,7 +298,7 @@ function damagePlayer(p, dmg) {
   if (p.ar > 0) { const a = Math.min(p.ar, dmg); p.ar -= a; dmg -= a; }
   p.hp -= dmg;
   p.inv = 0.8; p.lastHit = G.time; p.armorT = 0;
-  if (p.hp <= 0) { p.hp = 0; p.down = true; p.rev = 0; emit({ k: 'down', id: p.id }); }
+  if (p.hp <= 0) { p.hp = 0; p.down = true; p.rev = 0; emit({ k: 'down', id: p.id }); if (p.id !== G.me) UI.toast(`${p.name}님이 쓰러졌어요! 옆에 서서 살려주세요`); }
   return true;
 }
 
@@ -333,7 +333,7 @@ function hostHandle(id, m) {
       if (!it || it.k !== 'wpn' || Math.hypot(it.x - p.x, it.y - p.y) > 34) return;
       delItem(it.i);
       if (m.drop >= 0) addItem('wpn', p.x, p.y + 6, { w: m.drop });
-      toPlayer(id, { k: 'got', w: it.w });
+      toPlayer(id, { k: 'got', w: it.w, slot: m.slot });
       break;
     }
     case 'use': {
@@ -638,13 +638,13 @@ function applyEvent(ev) {
       if (ev.fx === 'hp') { SFX.pick(); const p = G.players.get(G.me); G.nums.push({ x: p.x, y: p.y - 14, v: '+체력', t: 0, col: '#ff6a8a' }); }
       if (ev.fx === 'mp') { SFX.pick(); const p = G.players.get(G.me); G.nums.push({ x: p.x, y: p.y - 14, v: '+에너지', t: 0, col: '#6ab4ff' }); }
       break;
-    case 'got': if (ev.id !== G.me) break; giveWeapon(ev.w); break;
+    case 'got': if (ev.id !== G.me) break; giveWeapon(ev.w, ev.slot); break;
     case 'tp': if (ev.id !== G.me) break; { const p = G.players.get(G.me); p.x = ev.x; p.y = ev.y; } break;
   }
 }
-function giveWeapon(w) {
-  if (ME.weapons[1] < 0) { ME.weapons[1] = w; ME.cur = 1; }
-  else ME.weapons[ME.cur] = w;
+function giveWeapon(w, slot) {
+  if (slot !== 0 && slot !== 1) slot = ME.weapons[1] < 0 ? 1 : ME.cur;
+  ME.weapons[slot] = w; ME.cur = slot;
   SFX.pick();
   UI.toast(`${WEAPONS[w].name} 획득 (${RARITY[WEAPONS[w].r].name})`);
 }
@@ -735,7 +735,7 @@ function localUpdate(dt) {
   }
   // 피격 느낌
   const hpar = p.hp + p.ar;
-  if (hpar < ME.lastHpAr) { G.shake = Math.max(G.shake, 5); G.flash = 0.25; SFX.hurt(); if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {} }
+  if (ME.lastHpAr >= 0 && hpar < ME.lastHpAr) { G.shake = Math.max(G.shake, 5); G.flash = 0.25; SFX.hurt(); if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {} }
   ME.lastHpAr = hpar;
   // 방 발견 (미니맵)
   const r = roomAtPx(G.M, p.x, p.y);
@@ -769,8 +769,9 @@ const VEND_COST = 20;
 function interact() {
   const it = nearInteract(); if (!it) return;
   if (it.k === 'wpn') {
-    const drop = ME.weapons[1] < 0 ? -1 : ME.weapons[ME.cur];
-    act({ t: 'pk', i: it.i, drop });
+    const slot = ME.weapons[1] < 0 ? 1 : ME.cur;
+    const drop = ME.weapons[1] < 0 ? -1 : ME.weapons[slot];
+    act({ t: 'pk', i: it.i, drop, slot });
   } else if (it.k === 'vend') {
     if (ME.coins < VEND_COST) { UI.toast(`코인이 ${VEND_COST}개 필요해요 (지금 ${ME.coins}개)`); return; }
     ME.coins -= VEND_COST; act({ t: 'use', i: it.i });

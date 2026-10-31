@@ -70,7 +70,7 @@ function onServerMsg(m) {
         case 's': applySnap(d); break;
         case 'level': applyLevel(d.seed, d.L); break;
         case 'over': UI.showOver(d.st); break;
-        case 'tolobby': G.mode = 'lobby'; UI.show('lobby'); UI.renderLobby(); break;
+        case 'tolobby': UI.leaveGame(); G.mode = 'lobby'; UI.show('lobby'); UI.renderLobby(); break;
       }
     }
   }
@@ -112,6 +112,7 @@ const Input = (() => {
     const tap = (sel, fn) => $(sel).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); SFX.init(); fn(); });
     tap('#btn-skill', useSkill); tap('#btn-swap', swapWeapon); tap('#btn-use', interact); tap('#btn-pause', () => UI.pause(true));
     addEventListener('keydown', e => {
+      if (e.target && e.target.tagName === 'INPUT') return;
       keys[e.code] = true;
       if (G.mode !== 'play') return;
       if (e.code === 'Space') { useSkill(); e.preventDefault(); }
@@ -123,16 +124,27 @@ const Input = (() => {
     addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'KeyJ' || e.code === 'KeyK') fireDown = false; });
     addEventListener('blur', () => { for (const k in keys) keys[k] = false; fireDown = false; mouseFire = false; });
   }
+  let jb = null, jk = null, jR = 0, jOn = null;
+  function sizeJoy() {
+    jb = $('#joy'); jk = $('#joy-knob'); jR = joyR();
+    jb.style.width = jb.style.height = jR * 2 + 'px';
+    showJoy(joy.id !== null);
+  }
   function showJoy(on) {
-    const b = $('#joy'), k = $('#joy-knob'), R = joyR();
-    b.style.width = b.style.height = R * 2 + 'px';
-    if (joy.id !== null) { b.style.left = joy.ox - R + 'px'; b.style.top = joy.oy - R + 'px'; }
-    else { b.style.left = innerWidth * 0.15 - R + 'px'; b.style.top = innerHeight * 0.7 - R + 'px'; }
-    k.style.transform = `translate(${joy.x * R}px, ${joy.y * R}px)`;
-    b.classList.toggle('active', on);
+    if (!jb) return sizeJoy();
+    const cx = joy.id !== null ? joy.ox : innerWidth * 0.15, cy = joy.id !== null ? joy.oy : innerHeight * 0.7;
+    jb.style.transform = `translate(${cx - jR}px, ${cy - jR}px)`;
+    jk.style.transform = `translate(${joy.x * jR}px, ${joy.y * jR}px)`;
+    if (jOn !== on) { jOn = on; jb.classList.toggle('active', on); }
+  }
+  function reset() {
+    joy.id = null; joy.x = joy.y = 0; fireId = null; fireDown = false; mouseFire = false;
+    for (const k in keys) keys[k] = false;
+    const fb = $('#btn-fire'); if (fb) fb.classList.remove('down');
+    showJoy(false);
   }
   return {
-    init, showJoy,
+    init, showJoy, sizeJoy, reset,
     state() {
       let mx = joy.x, my = joy.y;
       if (joy.id === null) {
@@ -179,7 +191,7 @@ const UI = {
     on('#b-start', () => this.startFromLobby());
     on('#b-resume', () => this.pause(false));
     on('#b-quit', () => { this.pause(false); toMenu(); });
-    on('#b-again', () => { $('#over').classList.remove('on'); if (G.online) { G.mode = 'lobby'; Net.send({ t: 'unlock' }); Net.broadcast({ t: 'tolobby' }); this.show('lobby'); this.renderLobby(); } else { G.mode = 'lobby'; this.show('lobby'); this.renderLobby(); } });
+    on('#b-again', () => { UI.leaveGame(); if (G.online) { G.mode = 'lobby'; Net.send({ t: 'unlock' }); Net.broadcast({ t: 'tolobby' }); this.show('lobby'); this.renderLobby(); } else { G.mode = 'lobby'; this.show('lobby'); this.renderLobby(); } });
     on('#b-over-menu', () => { $('#over').classList.remove('on'); toMenu(); });
     $('#t-autofire').addEventListener('change', e => { this.settings.autofire = e.target.checked; this.save(); });
     $('#t-sound').addEventListener('change', e => { this.settings.sound = e.target.checked; SFX.on = e.target.checked; this.save(); });
@@ -191,13 +203,13 @@ const UI = {
   async goOnline(after) {
     this.toast('서버에 연결하는 중…');
     Net.onMsg = onServerMsg;
-    try { await Net.connect(); after(); }
+    try { await Net.connect(); Net.send({ t: 'hello', name: G.name, v: 1 }); after(); }
     catch (e) { this.toast('서버에 연결하지 못했어요. 인터넷을 확인하거나 설정에서 서버 주소를 확인해 주세요'); }
   },
   async refreshList() {
     $('#room-list').innerHTML = '<div class="dim">불러오는 중…</div>';
     Net.onMsg = onServerMsg;
-    try { await Net.connect(); Net.send({ t: 'list' }); }
+    try { await Net.connect(); Net.send({ t: 'hello', name: G.name, v: 1 }); Net.send({ t: 'list' }); }
     catch (e) { $('#room-list').innerHTML = '<div class="dim">서버에 연결하지 못했어요</div>'; }
   },
   renderRoomList(rooms) {
@@ -269,10 +281,11 @@ const UI = {
     const h = HEROES[G.players.get(G.me).hero];
     $('#skill-name').textContent = h.skill;
     $('#btn-skill').style.setProperty('--c', h.color);
-    Input.showJoy(false);
-    ME.lastHpAr = 999;
+    Input.reset();
+    ME.lastHpAr = -1;
+    this._c = null;
   },
-  leaveGame() { $('#hud').classList.remove('on'); $('#touch').classList.remove('on'); $('#pause').classList.remove('on'); $('#over').classList.remove('on'); },
+  leaveGame() { Input.reset(); G.paused = false; clearTimeout(this._overT); $('#hud').classList.remove('on'); $('#touch').classList.remove('on'); $('#pause').classList.remove('on'); $('#over').classList.remove('on'); },
   pause(on) {
     $('#pause').classList.toggle('on', on);
     $('#t-autofire2').checked = this.settings.autofire;
@@ -283,49 +296,55 @@ const UI = {
     $('#over-stats').innerHTML = `도달한 층 <b>${Math.floor((st.L % 9) / 3) + 1}-${(st.L % 3) + 1}${st.L >= 9 ? ` (${Math.floor(st.L / 9) + 1}회차)` : ''}</b><br>처치한 적 <b>${st.kills}</b><br>플레이 시간 <b>${Math.floor(st.time / 60)}분 ${st.time % 60}초</b>`;
     $('#b-again').style.display = (!G.online || G.host) ? '' : 'none';
     $('#over-wait').style.display = (G.online && !G.host) ? '' : 'none';
-    setTimeout(() => $('#over').classList.add('on'), 900);
+    clearTimeout(this._overT); this._overT = setTimeout(() => { if (G.mode === 'play') $('#over').classList.add('on'); }, 900);
   },
   toast(t) {
     const el = $('#toast'); el.textContent = t; el.classList.add('on');
     clearTimeout(this._tt); this._tt = setTimeout(() => el.classList.remove('on'), 2400);
   },
-  // 매 프레임 HUD
+  // 매 프레임 HUD — 요소는 한 번만 찾고, 값이 바뀔 때만 DOM에 쓴다
   hud() {
     const p = G.players.get(G.me); if (!p) return;
-    const set = (id, v, max) => { $(id + ' i').style.width = (max ? Math.max(0, v / max) * 100 : 0) + '%'; $(id + ' b').textContent = `${Math.max(0, Math.ceil(v))}/${max}`; };
-    set('#bar-hp', p.hp, p.mhp); set('#bar-ar', p.ar, p.mar); set('#bar-en', ME.energy, ME.maxEnergy);
-    $('#coins').textContent = ME.coins;
-    const L = G.L; $('#lvl').textContent = `${Math.floor((L % 9) / 3) + 1}-${(L % 3) + 1}`;
+    const E = this._el || (this._el = {
+      hp: [$('#bar-hp i'), $('#bar-hp b')], ar: [$('#bar-ar i'), $('#bar-ar b')], en: [$('#bar-en i'), $('#bar-en b')],
+      coins: $('#coins'), lvl: $('#lvl'), fireIcon: $('#fire-icon'), fireCost: $('#fire-cost'), fireName: $('#fire-name'),
+      swapIcon: $('#swap-icon'), swap: $('#btn-swap'), skill: $('#btn-skill'), skillSec: $('#skill-sec'), use: $('#btn-use'),
+      team: $('#team'), boss: $('#boss'), bossI: $('#boss i'), bossB: $('#boss b'), banner: $('#banner'), bt: $('#banner-t'), bs: $('#banner-s'), down: $('#down-msg'),
+    });
+    const C = this._c || (this._c = {});
+    const put = (key, el, prop, v) => { if (C[key] !== v) { C[key] = v; if (prop === 'text') el.textContent = v; else if (prop === 'tf') el.style.transform = v; else if (prop === 'color') el.style.color = v; } };
+    const flag = (key, el, cls, on) => { if (C[key] !== on) { C[key] = on; el.classList.toggle(cls, on); } };
+    const bar = (k, v, max) => { put(k + 'w', E[k][0], 'tf', `scaleX(${max ? Math.max(0, Math.min(1, v / max)).toFixed(3) : 0})`); put(k + 't', E[k][1], 'text', `${Math.max(0, Math.ceil(v))}/${max}`); };
+    bar('hp', p.hp, p.mhp); bar('ar', p.ar, p.mar); bar('en', ME.energy, ME.maxEnergy);
+    put('coins', E.coins, 'text', String(ME.coins));
+    const L = G.L; put('lvl', E.lvl, 'text', `${Math.floor((L % 9) / 3) + 1}-${(L % 3) + 1}`);
     // 무기
-    const w = WEAPONS[ME.weapons[ME.cur]];
-    if (this._w !== ME.weapons[ME.cur]) { this._w = ME.weapons[ME.cur]; drawIcon($('#fire-icon'), this._w); $('#fire-cost').textContent = w.cost ? '⚡' + w.cost : '∞'; $('#fire-name').textContent = w.name; $('#fire-name').style.color = RARITY[w.r].color; }
+    const wid = ME.weapons[ME.cur], w = WEAPONS[wid];
+    if (C.w !== wid) { C.w = wid; drawIcon(E.fireIcon, wid); E.fireCost.textContent = w.cost ? '⚡' + w.cost : '∞'; E.fireName.textContent = w.name; E.fireName.style.color = RARITY[w.r].color; }
     const ow = ME.weapons[1 - ME.cur];
-    if (this._ow !== ow) { this._ow = ow; drawIcon($('#swap-icon'), ow); $('#btn-swap').classList.toggle('none', ow < 0); }
-    // 스킬
-    const h = HEROES[p.hero], k = ME.skillCd / h.cd;
-    $('#btn-skill').style.setProperty('--k', (k * 360) + 'deg');
-    $('#btn-skill').classList.toggle('ready', k <= 0);
+    if (C.ow !== ow) { C.ow = ow; drawIcon(E.swapIcon, ow); E.swap.classList.toggle('none', ow < 0); }
+    // 스킬: 남은 초만 표시 (원뿔 그라데이션을 매 프레임 다시 그리지 않음)
+    flag('ready', E.skill, 'ready', ME.skillCd <= 0);
+    put('sec', E.skillSec, 'text', ME.skillCd > 0 ? String(Math.ceil(ME.skillCd)) : '');
     // 상호작용
-    const it = nearInteract(), ub = $('#btn-use');
-    if (it) {
-      const lbl = { wpn: '줍기', chest: '상자 열기', rchest: '상자 열기', bchest: '보물 열기', vend: `뽑기 🪙${VEND_COST}`, portal: '다음 층' }[it.k];
-      if (ub.textContent !== lbl) ub.textContent = lbl;
-      ub.classList.add('on');
-    } else ub.classList.remove('on');
+    const it = nearInteract();
+    if (it) put('use', E.use, 'text', { wpn: '줍기', chest: '상자 열기', rchest: '상자 열기', bchest: '보물 열기', vend: `뽑기 🪙${VEND_COST}`, portal: '다음 층' }[it.k]);
+    flag('useOn', E.use, 'on', !!it);
     // 동료
-    const tm = $('#team'); let html = '';
-    for (const q of G.players.values()) if (q.id !== G.me) html += `<div class="mate${q.down ? ' down' : ''}"><span style="color:${HEROES[q.hero].color}">${esc(q.name)}</span><i style="width:${q.hp / q.mhp * 100}%"></i></div>`;
-    if (tm._h !== html) { tm.innerHTML = html; tm._h = html; }
+    let html = '';
+    for (const q of G.players.values()) if (q.id !== G.me) html += `<div class="mate${q.down ? ' down' : ''}"><span style="color:${HEROES[q.hero].color}">${esc(q.name)}</span><i style="transform:scaleX(${Math.max(0, q.hp / q.mhp).toFixed(2)})"></i></div>`;
+    if (C.team !== html) { C.team = html; E.team.innerHTML = html; }
     // 보스
     const boss = G.boss && G.enemies.get(G.boss);
-    $('#boss').classList.toggle('on', !!boss);
-    if (boss) { $('#boss i').style.width = Math.max(0, boss.hp / boss.mhp * 100) + '%'; $('#boss b').textContent = boss.def.name; }
+    flag('boss', E.boss, 'on', !!boss);
+    if (boss) { put('bossW', E.bossI, 'tf', `scaleX(${Math.max(0, boss.hp / boss.mhp).toFixed(3)})`); put('bossN', E.bossB, 'text', boss.def.name); }
     // 배너
-    const bn = $('#banner');
-    if (G.banner) { bn.classList.add('on'); if (bn._t !== G.banner.t) { bn._t = G.banner.t; $('#banner-t').textContent = G.banner.t; $('#banner-s').textContent = G.banner.sub; } }
-    else { bn.classList.remove('on'); bn._t = null; }
-    $('#down-msg').classList.toggle('on', p.down && !G.over);
-    this.minimap();
+    if (G.banner) { put('bt', E.bt, 'text', G.banner.t); put('bs', E.bs, 'text', G.banner.sub); }
+    flag('ban', E.banner, 'on', !!G.banner);
+    flag('down', E.down, 'on', p.down && !G.over);
+    // 미니맵은 1초에 12번이면 충분
+    this._mm = (this._mm || 0) + 1;
+    if (this._mm % 5 === 0) this.minimap();
   },
   minimap() {
     const c = $('#minimap'), g = c.getContext('2d'), M = G.M; if (!M) return;
@@ -365,7 +384,8 @@ function resize() {
   lc.width = VW; lc.height = VH;
   lctx.imageSmoothingEnabled = false;
   render.vig = null;
-  Input.showJoy(false);
+  Input.sizeJoy();
+  UI._c = null;
 }
 function frame(t) {
   requestAnimationFrame(frame);
